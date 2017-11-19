@@ -21,17 +21,7 @@
 Sensor mpu;
 //Sensor mpu(0x69); // Для второго датчика
 # endif
-
-//#define QUATERNION_OUT
-
-//#define EULER_OUT
 #define YPR_OUT
-
-//#define LOCAL_ACCELERATION_OUT
-
-//#define GLOBAL_ACCELERATION_OUT
-
-// #define PROCESSING_OUT
 #define SERIAL_SPEED 115200
 
 
@@ -62,26 +52,11 @@ uint8_t fifo_buffer[64];
 // Датчик отдаёт данные в виде кватерниона (по-умолчанию).
 Quaternion quaternion; // [w, x, y, z]
 
-// Эти данные об ускорении мы можем прямо получить от датчика (в радианах).
-VectorInt16 raw_acceleration; // [x, y, z]
-
-// Ускорение в локальной системе координат датчика
-VectorInt16 local_acceleration; // [x, y, z]
-
-// Ускорение в глобальной системе координат (относительно изначального положения датчика)
-VectorInt16 global_acceleration; // [x, y, z]
-
 // Вектор гравитации.
 VectorFloat gravity; // [x, y, z]
 
-// Эйлеровы углы.
-float euler[3]; // [psi, theta, phi]
-
 // YawPitchRoll
 float ypr[3]; // [yaw, pitch, roll]
-
-// Такие пакеты отправляем в среду Processing
-uint8_t processing_packet[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
 /*---Секция обнаружения прерываний---*/
 volatile bool mpu_interrupt = false;
@@ -175,16 +150,6 @@ void loop() {
 
     // wait for MPU interrupt or extra packet(s) available
     while (!mpu_interrupt && current_buffer_size < size_of_packet) {
-        // other program behavior stuff here
-        // .
-        // .
-        // .
-        // if you are really paranoid you can frequently test in between other
-        // stuff to see if mpu_interrupt is true, and if so, "break;" from the
-        // while() loop to immediately process the MPU data
-        // .
-        // .
-        // .
     }
 
     // reset interrupt flag and get INT_STATUS byte
@@ -214,30 +179,6 @@ void loop() {
 
         if (iteration == 0){
 
-        #ifdef QUATERNION_OUT
-            // display quaternion values in easy matrix form: w x y z
-            mpu.dmpGetQuaternion(&quaternion, fifo_buffer);
-            Serial.print("quat\t");
-            Serial.print(quaternion.w);
-            Serial.print("\t");
-            Serial.print(quaternion.x);
-            Serial.print("\t");
-            Serial.print(quaternion.y);
-            Serial.print("\t");
-            Serial.println(quaternion.z);
-        #endif
-
-        #ifdef EULER_OUT
-            mpu.dmpGetQuaternion(&quaternion, fifo_buffer);
-            mpu.dmpGetEuler(euler, &quaternion);
-            Serial.print("euler\t");
-            Serial.print(euler[0] * 180/M_PI);
-            Serial.print("\t");
-            Serial.print(euler[1] * 180/M_PI);
-            Serial.print("\t");
-            Serial.println(euler[2] * 180/M_PI);
-        #endif
-
         #ifdef YPR_OUT
             mpu.dmpGetQuaternion(&quaternion, fifo_buffer);
             mpu.dmpGetGravity(&gravity, &quaternion);
@@ -250,50 +191,6 @@ void loop() {
             //Serial.println(ypr[2] * 180/M_PI);
 
             Serial.println("S="+String(0)+" P="+String(ypr[1] * 180/M_PI)+" Y="+String(ypr[0] * 180/M_PI)+" R="+String(ypr[2] * 180/M_PI));
-        #endif
-
-        #ifdef LOCAL_ACCELERATION_OUT
-            // display real acceleration, adjusted to remove gravity
-            mpu.dmpGetQuaternion(&quaternion, fifo_buffer);
-            mpu.dmpGetAccel(&raw_acceleration, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &quaternion);
-            mpu.dmpGetLinearAccel(&local_acceleration, &raw_acceleration, &gravity);
-            Serial.print("areal\t");
-            Serial.print(local_acceleration.x);
-            Serial.print("\t");
-            Serial.print(local_acceleration.y);
-            Serial.print("\t");
-            Serial.println(local_acceleration.z);
-        #endif
-
-        #ifdef GLOBAL_ACCELERATION_OUT
-            // display initial world-frame acceleration, adjusted to remove gravity
-            // and rotated based on known orientation from quaternion
-            mpu.dmpGetQuaternion(&quaternion, fifo_buffer);
-            mpu.dmpGetAccel(&raw_acceleration, fifo_buffer);
-            mpu.dmpGetGravity(&gravity, &quaternion);
-            mpu.dmpGetLinearAccel(&local_acceleration, &raw_acceleration, &gravity);
-            mpu.dmpGetLinearAccelInWorld(&global_acceleration, &local_acceleration, &quaternionq);
-            Serial.print("aworld\t");
-            Serial.print(global_acceleration.x);
-            Serial.print("\t");
-            Serial.print(global_acceleration.y);
-            Serial.print("\t");
-            Serial.println(global_acceleration.z);
-        #endif
-    
-        #ifdef PROCESSING_OUT
-            // display quaternion values in InvenSense Teapot demo format:
-            processing_packet[2] = fifo_buffer[0];
-            processing_packet[3] = fifo_buffer[1];
-            processing_packet[4] = fifo_buffer[4];
-            processing_packet[5] = fifo_buffer[5];
-            processing_packet[6] = fifo_buffer[8];
-            processing_packet[7] = fifo_buffer[9];
-            processing_packet[8] = fifo_buffer[12];
-            processing_packet[9] = fifo_buffer[13];
-            Serial.write(processing_packet, 14);
-            processing_packet[11]++; // packetCount, loops at 0xFF on purpose
         #endif
         }
 
